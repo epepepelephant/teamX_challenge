@@ -3,29 +3,36 @@
 ## 结构
 
 ### 功能代码
-—src
-   └── teamx_challenge
-            ├── CMakeLists.txt  
-            ├── include
-            │   └── teamx_challenge
-            ├── launch
-            │   └── vision.launch.py 
-            ├── numbers  #存放模板
-            │   ├── 1.jpg
-            │   ├── 2.jpg
-            │   ├── 3.jpg
-            │   ├── 4.jpg
-            │   └── 5.jpg
-            ├── package.xml
-            └── src
-                ├── shooter_node.cpp
-                └── vision_node.cpp
+```
+src
+└── teamx_challenge
+    ├── CMakeLists.txt  
+    ├── include
+    │   └── teamx_challenge
+    ├── launch
+    │   └── vision.launch.py 
+    ├── numbers  # 存放模板
+    │   ├── 1.jpg
+    │   ├── 2.jpg
+    │   ├── 3.jpg
+    │   ├── 4.jpg
+    │   └── 5.jpg
+    ├── package.xml
+    └── src
+        ├── shooter_node.cpp
+        └── vision_node.cpp
+```
 
 ### 误差结果的截图
-—error_results
-    ├── armor.png
-    ├── rect.png
-    └── sphere.png
+```
+error_results
+├── armor.png
+├── rect.png
+└── sphere.png
+```
+
+### 算法原理
+[算法原理内容...]
 
 ## 算法原理
 vision_node.cpp
