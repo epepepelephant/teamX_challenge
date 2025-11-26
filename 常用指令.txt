@@ -1,0 +1,41 @@
+运行摄像头
+ros2 launch camera_sim_pkg camera.launch.py
+
+运行节点
+ros2 run teamx_challenge vision_node
+ros2 launch teamx_challenge vision.launch.py
+
+
+加载模型
+球形
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/sphere/sphere.sdf model_name:=sphere
+矩形
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/rectangle/rectangle.sdf model_name:=rectangle
+装甲板1号
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/armor/armor_1.sdf model_name:=armor_red_1
+
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/armor/armor_2.sdf model_name:=armor_red_2
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/armor/armor_3.sdf model_name:=armor_red_3
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/armor/armor_4.sdf model_name:=armor_red_4
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/armor/armor_5.sdf model_name:=armor_red_5
+
+加载模型（带坐标
+球形
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/sphere/sphere.sdf model_name:=sphere\x:=1.0 y:=3.0 z:=0.0
+矩形
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/rectangle/rectangle.sdf model_name:=rectangle\x:=1.0 y:=3.0 z:=0.0
+
+装甲板1号
+ros2 launch target_model_pkg target_action.launch.py model:=src/target_model_pkg/urdf/armor/armor_1.sdf model_name:=armor_1\x:=1.0 y:=3.0 z:=0.0
+
+
+
+装甲板运动
+ros2 topic pub /type std_msgs/msg/Int32 "{data: 1}"
+
+
+裁判系统启动调试
+ros2 launch referee_pkg referee_pkg_launch.xml \
+    TeamName:="TEAMENAME" \
+    StageSelect:=0 \
+    ModeSelect:=0
