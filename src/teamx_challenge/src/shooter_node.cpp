@@ -42,8 +42,9 @@ private:
   
   void shoot_callback(const shared_ptr<referee_pkg::srv::HitArmor::Request> request, 
                      shared_ptr<referee_pkg::srv::HitArmor::Response> response);
-  
-  bool solveTargetPosition(vector<Point2f> &imagePoints, Point3f &targetpoint);
+  //获取坐标
+  bool make2DTO3D(vector<Point2f> &imagePoints, Point3f &targetpoint);
+  //计算角度
   result calculateangles(Point3f center, double g);
 };
 
@@ -62,7 +63,7 @@ void Shooter::shoot_callback(const shared_ptr<referee_pkg::srv::HitArmor::Reques
   
   // 解算目标位置
   Point3f targetpoint;
-  if (!solveTargetPosition(points, targetpoint)) {
+  if (!make2DTO3D(points, targetpoint)) {
     RCLCPP_ERROR(this->get_logger(), "目标位置解算失败");
     response->yaw = 0;
     response->pitch = 0;
@@ -82,7 +83,7 @@ void Shooter::shoot_callback(const shared_ptr<referee_pkg::srv::HitArmor::Reques
               result1.yaw, result1.pitch, result1.roll);
 }
 
-bool Shooter::solveTargetPosition(vector<Point2f> &imagePoints, Point3f &targetpoint) {
+bool Shooter::make2DTO3D(vector<Point2f> &imagePoints, Point3f &targetpoint) {
   Mat rvec, tvec;
   Mat distCoeffs = cv::Mat::zeros(4, 1, CV_64F);
   
@@ -106,32 +107,49 @@ bool Shooter::solveTargetPosition(vector<Point2f> &imagePoints, Point3f &targetp
   return true;
 }
 
+// struct result{
+//   float yaw;
+//   float pitch;
+//   float roll;
+// };
+//result类用于存放结果
 result Shooter::calculateangles(Point3f center, double g){
   result result1;
   double target_x = center.x;
   double target_y = center.y;
   double target_z = center.z;
   
-  // 计算水平距离
-  double distance = sqrt(target_x * target_x + target_y * target_y);
+  // 计算水平距离 R
+  double R = sqrt(target_x * target_x + target_y * target_y);
   
-  RCLCPP_INFO(this->get_logger(), "水平距离: %.3f, 高度: %.3f", distance, target_z);
+  RCLCPP_INFO(this->get_logger(), "水平距离: %.3f, 高度: %.3f", R, target_z);
   
-  // 计算偏航角
+  // 计算偏航角 φ = arctan2(y_t, x_t)
   result1.yaw = atan2(target_y, target_x);
   
-  // 弹道计算 - 使用抛物线运动方程
-  // 公式: target_z = v0*sin(pitch)*t - 0.5*g*t^2
-  // 同时: distance = v0*cos(pitch)*t
-  // 消去t得到: target_z = distance*tan(pitch) - (g*distance^2)/(2*v0^2*cos(pitch)^2)
+  // 计算判别式 Δ = v0^4 - g(gR^2 + 2v0^2 z_t)
+  // 假设 v0_sq 是 v0 的平方
+  double Delta = v0_quad - g * (g * R * R + 2 * v0_sq * target_z);
   
-  double tan_pitch = (target_z + (g * distance * distance) / (2 * v0_sq)) / distance;
-  result1.pitch = atan(tan_pitch);
+  // 检查判别式是否有效
+  if (Delta < 0) {
+    RCLCPP_ERROR(this->get_logger(), "无实数解，判别式 Delta = %.3f < 0", Delta);
+    // 返回默认值或抛出异常
+    result1.pitch = 0.0;
+    result1.roll = 0.0;
+    return result1;
+  }
+  
+  // 计算俯仰角 θ = arctan[(v0^2 ± sqrt(Δ)) / (gR)]
+  // 这里选择正号解（通常对应较小的发射角）
+  double sqrt_Delta = sqrt(Delta);
+  double tan_theta = (v0_sq + sqrt_Delta) / (g * R);
+  result1.pitch = atan(tan_theta);
+  
   result1.roll = 0.0;
   
   return result1;
 }
-
 int main(int argc,char **argv){
   rclcpp::init(argc, argv);
   rclcpp::spin(make_shared<Shooter>());
