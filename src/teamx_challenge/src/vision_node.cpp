@@ -14,7 +14,6 @@
 #include <std_msgs/msg/header.hpp>
 #include <unordered_map>
 #include "sensor_msgs/msg/image.hpp"
-
 #include<vector>
 #include<string>
 using std::vector, std::string, std::cin, std::cout, std::endl, std::to_string,std::make_shared,std::unordered_map;
@@ -30,7 +29,7 @@ struct Armor{
     float angle;
     int num = -1;
 };
-//装甲板上识别出来的数字的顶点
+//装甲板上识别出来的数字的顶点（用于仿射变换）
 struct numpoints{
    Point2f pts[4];
 };
@@ -49,7 +48,6 @@ struct Sphere{
   float radius;
   float area;
 };
-
 //长方体
 struct Rects{
   Point2f pts[4];
@@ -58,7 +56,6 @@ struct Rects{
   float width;
   float height;
 };
-
 // 跟踪目标
 struct TrackedTarget{
   int id;
@@ -67,7 +64,7 @@ struct TrackedTarget{
   string type;
   int miss_count;//丢失帧数
 };
-
+//颜色的范围
 struct HSVRange{
   cv::Scalar lower; // HSV下限
   cv::Scalar upper; // HSV上限
@@ -77,14 +74,13 @@ Mat kernel_1 = getStructuringElement(MORPH_RECT, Size(1, 1));
 Mat kernel_3 = getStructuringElement(MORPH_RECT, Size(3, 3));
 Mat kernel_5= getStructuringElement(MORPH_RECT, Size(5,5));
 Mat kernel_round= getStructuringElement(MORPH_ELLIPSE, Size(3,3));
-
 //创建颜色的哈希表
 unordered_map<std::string, std::vector<HSVRange>> color_hsv_map = {
-    {"red", {  // 红色：2个HSV范围（vector包含2个元素）
+    {"red", {  // 红色
         {cv::Scalar(0, 120, 70),  cv::Scalar(10, 255, 255)},
         {cv::Scalar(170, 120, 70), cv::Scalar(179, 255, 255)}
     }},
-    {"green",  {{cv::Scalar(35, 120, 70),  cv::Scalar(77, 255, 255)}}},  // 1个范围（vector含1个元素）
+    {"green",  {{cv::Scalar(35, 120, 70),  cv::Scalar(77, 255, 255)}}},  
     {"blue",   {{cv::Scalar(100, 120, 70), cv::Scalar(130, 255, 255)}}},
     {"yellow", {{cv::Scalar(20, 120, 70),  cv::Scalar(34, 255, 255)}}},
     {"cyan",   {{cv::Scalar(80, 120, 70),  cv::Scalar(99, 255, 255)}}},
@@ -113,44 +109,42 @@ class TestNode : public rclcpp::Node {
 
 
  private:
+   Mat image;//从摄像头上得到的图像
+   Mat mask_white;//提取白色的图像（用于数字识别）
+   Mat hsv;//hsv处理后的图像
+   Mat result_image;//最终图像
 
-    Mat mask1_red, mask2_red, mask,hsv,image,mask_armor,mask_sphere,mask_rect,mask_white;
+   // 存放装甲板和灯条的信息
+   vector<Light> light_list;
+   vector<Armor> armor_red_list;
 
-    Mat result_image;
+   // 存放球体的信息
+   vector<Sphere> sphere_list;
 
+   // 长方体
+   vector<Rects> rect_list;
 
-    //存放装甲板和灯条的信息
-    vector<Light> light_list;
-    vector<Armor> armor_red_list;
+   // 存放数字模板
+   vector<Mat> template_imgs;
+   // 数字图像的四个顶点，用于仿射变换
+   vector<numpoints> num_points;
+   // 仿射变换后的图像
+   vector<Mat> pers_imgs;
+   // 动态运动中存在的对象
+   vector<TrackedTarget> tracker_targets;
+   // 当前帧出现的对象
+   vector<TrackedTarget> current_frame_targets;
+   // 动态识别对应的id号
+   int next_target_id = 1;
+   // 动态识别最大允许丢失的帧数
+   const int MAX_MISS_FRAMES = 3;
+   // 模板匹配阈值
+   const double MATCH_THRESHOLD = 0.75;
 
-    //存放球体的信息
-    vector<Sphere> sphere_list;
-
-    //长方体
-    vector<Rects> rect_list;
-
-    //存放数字模板
-    vector<Mat> template_imgs;
-    //数字图像的四个顶点，用于仿射变换
-    vector<numpoints> num_points;
-    //仿射变换后的图像
-    vector<Mat> pers_imgs;
-    //动态运动中存在的对象
-    vector<TrackedTarget> tracker_targets;
-    //当前帧出现的对象
-    vector <TrackedTarget> current_frame_targets;
-    //动态识别对应的id号
-    int next_target_id = 1;
-    //动态识别最大允许丢失的帧数
-    const int MAX_MISS_FRAMES = 3;
-    //模板匹配阈值
-    const double MATCH_THRESHOLD = 0.75;
-
-
-    // 订阅相机图像
-    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr Image_sub;
-    rclcpp::Publisher<referee_pkg::msg::MultiObject>::SharedPtr Target_pub;
-    rclcpp::Subscription<referee_pkg::msg::RaceStage>::SharedPtr Race_sub;
+   // 订阅相机图像
+   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr Image_sub;
+   rclcpp::Publisher<referee_pkg::msg::MultiObject>::SharedPtr Target_pub;
+   rclcpp::Subscription<referee_pkg::msg::RaceStage>::SharedPtr Race_sub;
 
    //---------回调函数-----------//
     void callback_camera(sensor_msgs::msg::Image::SharedPtr msg);
@@ -161,7 +155,7 @@ class TestNode : public rclcpp::Node {
     void preprocess(string colortype,vector<vector<Point>>&contours,Mat kernel);
     //---------装甲板识别的相关函数-----------//
 
-    // 灯条筛选
+  // 灯条筛选
     void findLights(const vector<vector<Point>> &contours);
   //灯条匹配    
     void matchLights(Mat &result_img); 
@@ -227,41 +221,38 @@ void TestNode::callback_camera(sensor_msgs::msg::Image::SharedPtr msg) {
         return;
       }
         result_image = image.clone();
-        //颜色筛选
-        cvtColor(image, hsv, COLOR_BGR2HSV);   
+        //提取hsv图像
+        cvtColor(image, hsv, COLOR_BGR2HSV); 
+        //定义轮廓  
         vector<vector<Point>>contours_armor_red;
-        preprocess("red",  contours_armor_red,kernel_1);
-        findLights(contours_armor_red);
-        matchLights(result_image);
-        //
-        //动态跟踪
+        vector<vector<Point>> contours_sphere;
+        vector<vector<Point>> contours_rect;
+         // 小球
+         preprocess("red", contours_sphere, kernel_round);
+         detect_red_circle(contours_sphere, result_image);
+         // 青色矩形
+         preprocess("cyan", contours_rect, kernel_1);
+         detect_green_rect(contours_rect, result_image);
+         // 数字检测
+         preprocess("red", contours_armor_red, kernel_1);
+         findLights(contours_armor_red);
+         matchLights(result_image);
+         perspective_transformation(num_points, pers_imgs);
+         preprocessnumber(pers_imgs);
+         getnumbers(pers_imgs, result_image, template_imgs);
+         //显示数字图像，用于调试
+         for (int i = 0; i < pers_imgs.size(); i++)
+         {
+           imshow(to_string(i), pers_imgs[i]);
+           waitKey(1);
+         }
+         //动态跟踪
          for (int i = 0; i < armor_red_list.size();i++){
            gettargets(armor_red_list[i]);
          }
          framematch();
-        
-        //
-        // 小球
-        vector<vector<Point>> contours_sphere;
-        preprocess("red", contours_sphere,kernel_round);
-        detect_red_circle(contours_sphere, result_image);
-        //
-        //青色矩形
-        vector<vector<Point>> contours_rect;
-        preprocess("cyan",  contours_rect,kernel_1);
-        detect_green_rect(contours_rect, result_image);
-        //
-        //数字检测
-        perspective_transformation(num_points, pers_imgs);
-        preprocessnumber(pers_imgs);
-        getnumbers(pers_imgs, result_image,template_imgs);
-        for (int i = 0; i < pers_imgs.size();i++){
-          imshow(to_string(i), pers_imgs[i]);
-          waitKey(1);
-                }
           imshow("Detection Result", result_image);
           waitKey(1);
-          
         // 创建并发布消息
         publishmsg(msg);
   } catch (const cv_bridge::Exception &e) {
@@ -296,7 +287,7 @@ void TestNode::preprocess(string colortype,vector<vector<Point>>&contours,Mat ke
     for (const auto& range : ranges) {
         Mat single_mask;
         inRange(hsv, range.lower, range.upper, single_mask);  // 单次筛选
-        bitwise_or(maskafter, single_mask, maskafter);        // 合并掩码（或运算，保留所有匹配区域）
+        bitwise_or(maskafter, single_mask, maskafter);        // 合并掩码
     }
   morphologyEx(maskafter, maskafter, MORPH_CLOSE, kernel);
   morphologyEx(maskafter, maskafter, MORPH_OPEN, kernel);
@@ -316,9 +307,8 @@ void TestNode::findLights(const vector<vector<Point>> &contours) {
         float inital_area = contourArea(contours[i]);
         float area_ratio = inital_area / area_rect;
         float angle = rot_rect.angle;
-        if(angle==0.0f)
-          angle += 90.0;
-        //cout << angle << endl;
+        if(angle<45.0f)
+          angle = 90.0-angle;
 
         //用面积，填充率，长宽比筛选灯条
         if(area_rect<5||aspect_ratio<1.5||area_ratio<0.1) continue;
@@ -602,7 +592,7 @@ void TestNode::detect_red_circle(vector<vector<Point>> &contours, Mat &result_im
 void TestNode::detect_green_rect(vector<vector<Point>> &contours, Mat &result_image){
   for (size_t i = 0; i < contours.size(); ++i) {
       double area_contour = contourArea(contours[i]);
-      if (area_contour < 150) continue; // 忽略过小噪声
+      if (area_contour < 15) continue; // 忽略过小噪声
 
       // 用最小外接旋转矩形拟合轮廓
       RotatedRect r = minAreaRect(contours[i]);
@@ -649,7 +639,6 @@ void TestNode::detect_green_rect(vector<vector<Point>> &contours, Mat &result_im
           return a.y > b.y;  // 小的y在前 = 上面
       });
 
-      // 现在顺序是：左下(0), 左上(1), 右上(2), 右下(3)
 
         vector<Point2f> ordered = {pts[0], pts[2], pts[3], pts[1]}; // TL,TR,BR,BL
 
@@ -714,7 +703,6 @@ void TestNode::gettemplate(vector<Mat>&templaate_imgs){
   template_imgs.clear();
   for (int i = 1; i <= 5; i++)
   {
-    //这里要改成你的绝对路径
     string package_share_dir = ament_index_cpp::get_package_share_directory("teamx_challenge");
     string pathi = package_share_dir + "/numbers/" + to_string(i) + ".jpg";    Mat new_template = imread(pathi);
     cvtColor(new_template, new_template, COLOR_BGR2GRAY); // 转为1通道灰度图
