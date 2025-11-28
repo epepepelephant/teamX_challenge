@@ -551,7 +551,7 @@ bool TestNode::constructArmor(const Light &light1, const Light &light2, std::vec
     } else {
         std::sort(top.begin(), top.end(), [](const cv::Point2f &a, const cv::Point2f &b){ return a.x < b.x; });
         std::sort(bottom.begin(), bottom.end(), [](const cv::Point2f &a, const cv::Point2f &b){ return a.x < b.x; });
-        armor_corners = { bottom[0], bottom[1], top[1], top[0] }; // TL,TR,BR,BL
+        armor_corners = { bottom[0], bottom[1], top[1], top[0] }; 
     }
 
     return true;

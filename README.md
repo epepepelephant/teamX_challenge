@@ -1,8 +1,12 @@
 # 思想道德与法治 校内赛
 
+## 技术报告
+https://www.yuque.com/yuqueyonghu0v3vd9/yq33pp/egm8l67b2pydo5he?singleDoc#
+
 ## 结构
 
 ### 功能代码
+(src/teamx_challenge)
 ```
 src
 └── teamx_challenge
