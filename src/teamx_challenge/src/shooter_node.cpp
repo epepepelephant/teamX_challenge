@@ -32,7 +32,8 @@ private:
   const double v0 = 15.0; // 增加初速度
   const double v0_sq = v0 * v0;
   const double v0_quad = v0_sq * v0_sq;
-  
+  const double height_set = 0.222;
+
   Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 554.383, 0, 320,
                       0, 554.383, 320,  
                       0, 0, 1);
@@ -96,12 +97,12 @@ void Shooter::shoot_callback(const shared_ptr<referee_pkg::srv::HitArmor::Reques
               targetpoint.x, targetpoint.y, targetpoint.z);
   
   // 计算欧拉角
-  result result1 = calculateangles(targetpoint, g);
-  response->yaw = result1.yaw;
-  response->pitch = result1.pitch;
-  response->roll = result1.roll;
+  result res = calculateangles(targetpoint, g);
+  response->yaw = res.yaw;
+  response->pitch = res.pitch;
+  response->roll = res.roll;
   RCLCPP_INFO(this->get_logger(), "角度: yaw=%.3f, pitch=%.3f, roll=%.3f", 
-              result1.yaw, result1.pitch, result1.roll);
+              res.yaw, res.pitch, res.roll);
 }
 
 bool Shooter::make2DTO3D(vector<Point3f> &armorpoints, Point3f &targetpoint) {
@@ -123,8 +124,8 @@ bool Shooter::make2DTO3D(vector<Point3f> &armorpoints, Point3f &targetpoint) {
   
   // tvec就是相机坐标系下的目标位置
   targetpoint.x = tvec.at<double>(0);
-  targetpoint.y = tvec.at<double>(1); 
-  targetpoint.z = tvec.at<double>(2);
+  targetpoint.z = tvec.at<double>(1); 
+  targetpoint.y = tvec.at<double>(2);
   
   return true;
 }
@@ -136,18 +137,18 @@ bool Shooter::make2DTO3D(vector<Point3f> &armorpoints, Point3f &targetpoint) {
 // };
 //result类用于存放结果
 result Shooter::calculateangles(Point3f center, double g){
-  result result1;
+  result res;
   double target_x = center.x;
   double target_y = center.y;
   double target_z = center.z;
   
   // 计算水平距离 R
-  double R = sqrt(target_x * target_x + target_z * target_z);
-  double height_diff = -target_y-0.222;
+  double R = sqrt(target_x * target_x + target_y * target_y);
+  double height_diff = -target_z-height_set;
   RCLCPP_INFO(this->get_logger(), "水平距离: %.3f, 高度: %.3f", R, height_diff);
   
   // 计算偏航角 φ = arctan2(y_t, x_t)
-  result1.yaw = atan2(target_y, target_x);
+  res.yaw = atan2(target_y, target_x);
   
   // 计算判别式 Δ = v0^4 - g(gR^2 + 2v0^2 z_t)
   // 假设 v0_sq 是 v0 的平方
@@ -157,9 +158,9 @@ result Shooter::calculateangles(Point3f center, double g){
   if (Delta < 0) {
     RCLCPP_ERROR(this->get_logger(), "无实数解，判别式 Delta = %.3f < 0", Delta);
     // 返回默认值或抛出异常
-    result1.pitch = 0.0;
-    result1.roll = 0.0;
-    return result1;
+    res.pitch = 0.0;
+    res.roll = 0.0;
+    return res;
   }
   
   // 计算俯仰角 θ = arctan[(v0^2 ± sqrt(Δ)) / (gR)]
@@ -168,11 +169,11 @@ result Shooter::calculateangles(Point3f center, double g){
   double tan_thetahlow = (v0_sq - sqrt_Delta) / (g * R);
   double tan_thetahhigh = (v0_sq + sqrt_Delta) / (g * R);
   double tan_theta = (v0_sq - sqrt_Delta > 0) ? tan_thetahlow : tan_thetahhigh;
-  result1.pitch = atan(tan_theta);
+  res.pitch = atan(tan_theta);
 
-  result1.roll = 0.0;
+  res.roll = 0.0;
   
-  return result1;
+  return res;
 }
 int main(int argc,char **argv){
   rclcpp::init(argc, argv);
