@@ -29,16 +29,7 @@ src
 ```
 
 ### 误差结果的截图
-[误差截图](./error_results/)
-```
-error_results
-├── armor.png
-├── rect.png
-├──sphere.png
-├──运行的一小段日志.log
-├──TEAMENAME_results0.json
-└──TEAMENAME_results0.json.sha256
-```
+[裁判系统运行结果](./results/)
 
 ## 算法原理
 
@@ -81,7 +72,7 @@ OpenCV
 C++17 
 
 ## 在docker上运行
-把vision_node.cpp中的gettemplate函数中的路径这样修改，然后运行docker-compose111.yml即可
+[vision_node要替换的相关行](/src/teamx_challenge/src/vision_node.cpp#L705-L708)然后运行docker-compose111.yml即可
 string template_path = "/home/va/templates/";
   for (int i = 1; i <= 5; i++)
   {
