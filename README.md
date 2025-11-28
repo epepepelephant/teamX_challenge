@@ -80,3 +80,9 @@ Gazebo Ignition Fortress
 OpenCV
 C++17 
 
+## 在docker上运行
+把vision_node.cpp中的gettemplate函数中的路径这样修改，然后运行docker-compose111.yml即可
+string template_path = "/home/va/templates/";
+  for (int i = 1; i <= 5; i++)
+  {
+    string pathi = template_path + to_string(i) + ".jpg";
