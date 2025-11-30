@@ -6,10 +6,11 @@
 ## 结构
 
 ### 功能代码
-[功能包](./src/teamx_challenge)
+[功能包目录](./src/teamx_challenge)
 ```
 src
 └── teamx_challenge
+    ├── codewhilecompeting #比赛时候的代码的目录
     ├── CMakeLists.txt  
     ├── include
     │   └── teamx_challenge
